@@ -1,25 +1,27 @@
-## **Aula: Java Swing com Gradle e Conexão com Banco de Dados em MVC**  
+## **Aula: Java Swing com Gradle e Conexão com Banco de Dados em MVC**
 
-### **Objetivo da Aula**  
-- Entender como estruturar um projeto Java Swing utilizando Gradle.  
-- Implementar a conexão com banco de dados seguindo o padrão **MVC**.  
-- Aprender boas práticas para organização do código.  
+### **Objetivo da Aula**
+- Entender como estruturar um projeto Java Swing utilizando Gradle.
+- Implementar a conexão com banco de dados seguindo o padrão **MVC**.
+- Aprender boas práticas para organização do código.
 
-## **1. Criando um Projeto Java Swing com Gradle**  
+---
 
-### **Passo 1: Criando um novo projeto Gradle**  
-Se estiver usando o IntelliJ IDEA:  
-1. Vá em **File** → **New** → **Project**.  
-2. Escolha **Gradle** e marque **Java**.  
-3. Configure o nome do projeto e finalize.  
+## **1. Criando um Projeto Java Swing com Gradle**
 
-Caso prefira criar manualmente pelo terminal:  
+### **Passo 1: Criando um novo projeto Gradle**
+Se estiver usando o IntelliJ IDEA:
+1. Vá em **File** → **New** → **Project**.
+2. Escolha **Gradle** e marque **Java**.
+3. Configure o nome do projeto e finalize.
+
+Caso prefira criar manualmente pelo terminal:
 ```sh
 gradle init --type java-application
 ```
 
-### **Passo 2: Adicionando Dependências**  
-No arquivo **`build.gradle`**, adicione:  
+### **Passo 2: Adicionando Dependências**
+No arquivo **`build.gradle`**, adicione:
 
 ```gradle
 plugins {
@@ -36,24 +38,22 @@ dependencies {
 }
 ```
 
-Depois, execute:  
+Depois, execute:
 ```sh
 gradle build
 ```
 
 ---
 
-## **3. Estruturando em MVC**  
+## **2. Estruturando o Projeto em MVC**
 
-### **Analogia: Restaurante**  
-Um restaurante bem organizado tem:  
-- **View (Garçom):** Lida com os clientes e exibe o menu.  
-- **Controller (Cozinheiro):** Processa os pedidos e os encaminha.  
-- **Model (Estoque/Cadastro de pratos):** Guarda as informações dos ingredientes e receitas.  
+### **Analogia: Restaurante**
+Um restaurante bem organizado tem:
+- **View (Garçom):** Interface com o usuário (telas do Swing).
+- **Controller (Cozinheiro):** Processa os pedidos e gerencia as regras de negócio.
+- **Model (Estoque/Cadastro de pratos):** Interage com o banco de dados.
 
-No nosso caso, o **Model** representa o banco de dados, o **View** são as telas Swing, e o **Controller** gerencia a lógica.  
-
-A estrutura de diretórios será:  
+A estrutura de diretórios será:
 
 ```
 src/main/java/com/exemplo
@@ -62,7 +62,7 @@ src/main/java/com/exemplo
 │   ├── Cliente.java
 │   ├── ClienteDAO.java
 │── view
-│   ├── ClienteView.java
+│   ├── TelaPrincipal.java
 │── controller
 │   ├── ClienteController.java
 │── Main.java
@@ -70,39 +70,65 @@ src/main/java/com/exemplo
 
 ---
 
-## **4. Implementação Prática**  
+## **3. Implementação Prática**
 
-### **Model: Conectando ao Banco de Dados**  
-O **Model** é responsável por lidar com o banco de dados.  
+### **Model: Conectando ao Banco de Dados**
 
-Criamos a classe **Conexao.java** para gerenciar a conexão:  
+A classe `Conexao.java` gerencia a conexão com o banco e cria a tabela automaticamente:
 
 ```java
-package com.exemplo.model;
+package model;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 public class Conexao {
     private static final String URL = "jdbc:mysql://localhost:3306/seu_banco";
     private static final String USUARIO = "root";
     private static final String SENHA = "";
+    private static Connection connection;
 
     public static Connection conectar() {
         try {
-            return DriverManager.getConnection(URL, USUARIO, SENHA);
+            if (connection == null || connection.isClosed()) {
+                connection = DriverManager.getConnection(URL, USUARIO, SENHA);
+                criarTabela();
+            }
+            return connection;
         } catch (SQLException e) {
             throw new RuntimeException("Erro na conexão com o banco de dados", e);
+        }
+    }
+
+    public static void fechar() {
+        try {
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void criarTabela() {
+        String sql = "CREATE TABLE IF NOT EXISTS clientes (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(255) NOT NULL)";
+        
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute(sql);
+            System.out.println("Tabela 'clientes' verificada/criada com sucesso.");
+        } catch (SQLException e) {
+            throw new RuntimeException("Erro ao criar a tabela no banco de dados", e);
         }
     }
 }
 ```
 
-Agora, criamos a classe **Cliente.java**, que representa a tabela do banco:  
+A classe `Cliente.java` representa um cliente:
 
 ```java
-package com.exemplo.model;
+package model;
 
 public class Cliente {
     private int id;
@@ -121,17 +147,16 @@ public class Cliente {
 }
 ```
 
-A classe **ClienteDAO.java** será responsável por buscar e salvar clientes no banco:  
+A classe `ClienteDAO.java` gerencia operações no banco:
 
 ```java
-package com.exemplo.model;
+package model;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ClienteDAO {
-
     public void adicionarCliente(Cliente cliente) {
         String sql = "INSERT INTO clientes (nome) VALUES (?)";
 
@@ -166,13 +191,13 @@ public class ClienteDAO {
 
 ---
 
-### **Controller: Manipulando os dados**  
+### **Controller: Manipulando os Dados**
 
 ```java
-package com.exemplo.controller;
+package controller;
 
-import com.exemplo.model.Cliente;
-import com.exemplo.model.ClienteDAO;
+import model.Cliente;
+import model.ClienteDAO;
 
 import java.util.List;
 
@@ -192,68 +217,42 @@ public class ClienteController {
 
 ---
 
-### **View: Criando a Interface Gráfica**  
+### **View: Criando a Interface Gráfica**
 
 ```java
-package com.exemplo.view;
+package view;
 
-import com.exemplo.controller.ClienteController;
-import com.exemplo.model.Cliente;
+import controller.ClienteController;
+import model.Cliente;
 
 import javax.swing.*;
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
-public class ClienteView extends JFrame {
+public class TelaPrincipal extends javax.swing.JFrame {
     private ClienteController controller = new ClienteController();
-    private JTextField campoNome = new JTextField(20);
-    private JTextArea areaClientes = new JTextArea(10, 30);
 
-    public ClienteView() {
-        setTitle("Cadastro de Clientes");
-        setSize(400, 300);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new FlowLayout());
+    public TelaPrincipal() {
+        initComponents();
+    }
 
-        JButton botaoAdicionar = new JButton("Adicionar Cliente");
-        botaoAdicionar.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                controller.adicionarCliente(campoNome.getText());
-                atualizarLista();
-            }
-        });
-
-        add(new JLabel("Nome:"));
-        add(campoNome);
-        add(botaoAdicionar);
-        add(new JScrollPane(areaClientes));
-
+    private void btnRegistrarActionPerformed(java.awt.event.ActionEvent evt) {
+        controller.adicionarCliente(txtNome.getText());
         atualizarLista();
-        setVisible(true);
     }
 
     private void atualizarLista() {
-        areaClientes.setText("");
+        txtAreaClientes.setText("");
         for (Cliente c : controller.listarClientes()) {
-            areaClientes.append(c.getId() + " - " + c.getNome() + "\n");
+            txtAreaClientes.append(c.getId() + " - " + c.getNome() + "\n");
         }
-    }
-
-    public static void main(String[] args) {
-        new ClienteView();
     }
 }
 ```
 
 ---
 
-## **5. Exercícios**  
+## **4. Exercícios**
+1. Adicionar um campo **email** no cadastro de clientes.
+2. Criar um botão para excluir clientes.
+3. Permitir a edição do nome de um cliente.
+4. Modificar `Conexao` para suportar SQLite.
 
-1. **Adicionar campo "email"**: Modifique o código para incluir um campo **email** na classe `Cliente` e altere o banco de dados, o DAO e a interface gráfica para suportar esse novo atributo.  
-
-2. **Excluir Cliente**: Adicione um botão para remover um cliente da lista.  
-
-3. **Editar Cliente**: Permita que o usuário edite o nome de um cliente já cadastrado.  
-
-4. **Conectar com SQLite**: Modifique a classe `Conexao` para usar SQLite em vez de MySQL.  
