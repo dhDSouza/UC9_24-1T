@@ -250,6 +250,6 @@ public class TelaLogin extends JFrame {
 
 ## **4. Exercícios**
 1. Criar um botão de **registro de usuário**.
-2. Implementar um botão **logout**.
-3. Melhorar a interface gráfica com **JPanels e Layouts**.
-
+2. Criar uma tela principal para a aplicação, que exiba a mensagem Bem vindo <nome do usuário> ao entrar.
+3. Implementar um botão **logout**.
+4. Melhorar a interface gráfica com **JPanels e Layouts**.
